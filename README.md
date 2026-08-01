@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/OpenCV-00FFFF?style=for-the-badge&logo=opencv&logoColor=black" alt="OpenCV"/>
   <img src="https://img.shields.io/badge/Python-FFD700?style=for-the-badge&logo=python&logoColor=black" alt="Python"/>
   <img src="https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" alt="C++"/>
-  <img src="https://img.shields.io/badge/ESP32-A22846?style=for-the-badge&logo=ESP32-pi&logoColor=white" al
+  <img src="https://img.shields.io/badge/ESP32-A22846?style=for-the-badge&logo=ESP32-pi&logoColor=white"
   <img src="https://img.shields.io/badge/Fusion360-00FFFF?style=for-the-badge&logo=Fusion360&logoColor=black" alt="Fusion360"/>
     <img src="https://img.shields.io/badge/3D Printing-00GGGG?style=for-the-badge&logo=3DPrinting&logoColor=black" alt="3D Printing"/>
 </p>
