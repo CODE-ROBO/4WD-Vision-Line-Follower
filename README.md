@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" alt="C++"/>
   <img src="https://img.shields.io/badge/Fusion360-00FFFF?style=for-the-badge&logo=Fusion360&logoColor=black" alt="Fusion360"/>
   <img src="https://img.shields.io/badge/3D Printing-00GGGG?style=for-the-badge&logo=3DPrinting&logoColor=black" alt="3D Printing"/>
-  <img src="https://img.shields.io/badg
+  <img src="https://img.shields.io/
 </p>
 
 <p align="center">
