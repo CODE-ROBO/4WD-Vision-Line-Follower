@@ -1,0 +1,111 @@
+%% =========================================================================
+%  4WD VISION LINE FOLLOWER: DIFFERENTIAL DRIVE KINEMATICS & PID SOLVER
+%  Architecture: 4WD Skid-Steer Differential Rover (Wheelbase L, Track W)
+%  Evaluates cross-track error response along an S-Curve reference trajectory
+% =========================================================================
+clear; clc; close all;
+
+%% 1. PLATFORM GEOMETRY & CONSTRAINTS
+track_w      = 0.165;       % Lateral distance between left & right wheels (m)
+wheel_radius = 0.035;       % 70mm rubber wheel radius (m)
+v_nominal    = 0.40;        % Target forward linear velocity (m/s)
+
+% PID Gains
+Kp = 2.40;
+Ki = 0.05;
+Kd = 0.45;
+
+%% 2. SIMULATION TIMESTEP & SETUP
+dt    = 0.01;               % 100 Hz simulation loop (s)
+t_end = 12.0;               % Simulation duration (s)
+t     = 0:dt:t_end;
+N     = length(t);
+
+% State Vector: [x; y; theta] in World Frame
+states = zeros(3, N);
+states(:, 1) = [0.0; -0.08; deg2rad(5.0)]; % Initial cross-track offset (-8 cm, 5 deg yaw)
+
+% Reference Path: Sine wave trajectory y_ref(x) = 0.25 * sin(1.2 * x)
+x_ref = linspace(0, 6.0, 1000);
+y_ref = 0.25 * sin(1.2 * x_ref);
+
+error_integral = 0;
+prev_error     = 0;
+
+omega_history = zeros(1, N);
+left_pwm      = zeros(1, N);
+right_pwm     = zeros(1, N);
+
+fprintf('Running 4WD Skid-Steer closed-loop trajectory simulation...\n');
+
+%% 3. CLOSED-LOOP TRAJECTORY TRACKING
+for k = 1:N-1
+    x_curr     = states(1, k);
+    y_curr     = states(2, k);
+    theta_curr = states(3, k);
+    
+    % Find target point on reference path at current lookahead distance
+    y_target = 0.25 * sin(1.2 * x_curr);
+    theta_path = atan(0.25 * 1.2 * cos(1.2 * x_curr));
+    
+    % Lateral Cross-Track Error (e_y)
+    e_y = y_target - y_curr;
+    e_theta = theta_path - theta_curr;
+    e_theta = atan2(sin(e_theta), cos(e_theta)); % Normalize [-pi, pi]
+    
+    % Combined Steering Error Metric
+    total_error = e_y + 0.35 * e_theta;
+    
+    % PID Controller
+    error_integral = error_integral + total_error * dt;
+    error_integral = max(-1.0, min(1.0, error_integral)); % Anti-windup
+    error_deriv = (total_error - prev_error) / dt;
+    
+    omega_cmd = (Kp * total_error) + (Ki * error_integral) + (Kd * error_deriv);
+    omega_history(k) = omega_cmd;
+    prev_error = total_error;
+    
+    % Skid-Steer Differential Wheel Velocity Allocation
+    v_left  = v_nominal - (omega_cmd * track_w / 2.0);
+    v_right = v_nominal + (omega_cmd * track_w / 2.0);
+    
+    left_pwm(k)  = max(0, min(255, (v_left / 0.6) * 255));
+    right_pwm(k) = max(0, min(255, (v_right / 0.6) * 255));
+    
+    % Unicycle Kinematic Integration:
+    % dx/dt = v * cos(theta), dy/dt = v * sin(theta), dtheta/dt = omega
+    dx     = v_nominal * cos(theta_curr) * dt;
+    dy     = v_nominal * sin(theta_curr) * dt;
+    dtheta = omega_cmd * dt;
+    
+    states(:, k+1) = states(:, k) + [dx; dy; dtheta];
+end
+omega_history(N) = omega_history(N-1);
+left_pwm(N)      = left_pwm(N-1);
+right_pwm(N)     = right_pwm(N-1);
+
+%% 4. VISUALIZATION
+figure('Color', [0.1 0.1 0.1], 'Position', [120, 120, 1050, 600]);
+
+subplot(2, 2, [1 3]);
+plot(x_ref, y_ref, '--', 'Color', [1 0.8 0], 'LineWidth', 2.0); hold on;
+plot(states(1, :), states(2, :), 'Color', [0 1 1], 'LineWidth', 2.2);
+grid on; xlabel('X Position (m)'); ylabel('Y Position (m)');
+title('4WD Ground Track vs. Reference Trajectory', 'Color', 'w');
+legend({'Reference Line Path', 'Actual Vehicle Trajectory'}, 'TextColor', 'w', 'Color', [0.2 0.2 0.2]);
+set(gca, 'Color', [0.15 0.15 0.15], 'XColor', 'w', 'YColor', 'w');
+axis equal;
+
+subplot(2, 2, 2);
+plot(t, omega_history, 'Color', [1 0.3 0.3], 'LineWidth', 1.8); grid on;
+title('Yaw Angular Rate Command \omega (rad/s)', 'Color', 'w');
+xlabel('Time (s)'); ylabel('\omega (rad/s)');
+set(gca, 'Color', [0.15 0.15 0.15], 'XColor', 'w', 'YColor', 'w');
+
+subplot(2, 2, 4);
+plot(t, left_pwm, 'Color', [0.2 1 0.2], 'LineWidth', 1.5); hold on;
+plot(t, right_pwm, 'Color', [0.2 0.6 1], 'LineWidth', 1.5); grid on;
+title('Differential Motor PWM Inputs (0-255)', 'Color', 'w');
+xlabel('Time (s)'); ylabel('PWM Command');
+legend({'Left Motors', 'Right Motors'}, 'TextColor', 'w', 'Color', [0.2 0.2 0.2]);
+set(gca, 'Color', [0.15 0.15 0.15], 'XColor', 'w', 'YColor', 'w');
