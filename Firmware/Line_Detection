@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""
+4WD Vision Line Follower: OpenCV Real-Time Contour & Lateral Error Extractor
+Captures optical frames, applies HSV thresholding, computes spatial moments,
+and dispatches normalized lateral centroid error to the ESP32 via Serial.
+"""
+
+import sys
+import time
+import cv2
+import numpy as np
+
+try:
+    import serial
+    SERIAL_AVAILABLE = True
+except ImportError:
+    SERIAL_AVAILABLE = False
+
+class VisionLineDetector:
+    def __init__(self, serial_port="/dev/ttyUSB0", baudrate=115200, camera_id=0):
+        self.camera_id = camera_id
+        self.cap = cv2.VideoCapture(self.camera_id)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+        self.cap.set(cv2.CAP_PROP_FPS, 30)
+
+        # HSV Thresholds for Black Guidance Tape on Light Floor
+        self.lower_hsv = np.array([0, 0, 0])
+        self.upper_hsv = np.array([180, 255, 65])
+
+        self.ser = None
+        if SERIAL_AVAILABLE:
+            try:
+                self.ser = serial.Serial(serial_port, baudrate, timeout=0.05)
+                time.sleep(1.5)
+                print(f"[INFO] Connected to ESP32 on {serial_port} @ {baudrate} baud.")
+            except Exception as e:
+                print(f"[WARNING] Serial connection bypassed: {e}")
+
+    def process_stream(self):
+        print("[INFO] Processing optical vision stream. Press 'q' to abort.")
+        
+        while self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+
+            h, w, _ = frame.shape
+            # Region of Interest (ROI): Sample lower third of frame for immediate path response
+            roi = frame[int(h * 0.65):h, 0:w]
+            hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+            mask = cv2.inRange(hsv, self.lower_hsv, self.upper_hsv)
+
+            # Morphological Noise Filtering
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+            mask = cv2.erode(mask, kernel, iterations=1)
+            mask = cv2.dilate(mask, kernel, iterations=2)
+
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            if contours:
+                # Select largest continuous contour (primary track)
+                c = max(contours, key=cv2.contourArea)
+                m = cv2.moments(c)
+                if m["m00"] > 300: # Minimum valid contour area
+                    cx = int(m["m10"] / m["m00"])
+                    cy = int(m["m01"] / m["m00"])
+
+                    # Lateral Error: Difference from frame horizontal center (w/2)
+                    frame_center_x = w // 2
+                    lateral_error = float(cx - frame_center_x)
+
+                    # Dispatch to ESP32: "ERR:<lateral_error>\n"
+                    if self.ser and self.ser.is_open:
+                        cmd = f"ERR:{lateral_error:.2f}\n"
+                        self.ser.write(cmd.encode("utf-8"))
+
+                    # Visual Feedback
+                    cv2.circle(roi, (cx, cy), 5, (0, 255, 0), -1)
+                    cv2.line(roi, (frame_center_x, cy), (cx, cy), (0, 0, 255), 2)
+                    cv2.putText(frame, f"Error: {lateral_error:.1f} px", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+            cv2.imshow("Track ROI", roi)
+            cv2.imshow("Binary Mask", mask)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        self.cap.release()
+        cv2.destroyAllWindows()
+        if self.ser:
+            self.ser.close()
+
+if __name__ == "__main__":
+    detector = VisionLineDetector()
+    detector.process_stream()
