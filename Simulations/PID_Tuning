@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""
+4WD Mobile Robot: Lateral Tracking PID Parameter Sweep & Step Response
+Evaluates step response across variable P, PI, and PID configurations to benchmark
+settling time, percent overshoot, and steady-state error under track perturbations.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def evaluate_pid_responses():
+    dt = 0.005 # 200 Hz
+    t = np.arange(0.0, 4.0, dt)
+    n = len(t)
+    step_target_px = 60.0 # 60-pixel step offset disturbance
+
+    # Gain sets: [Label, Kp, Ki, Kd]
+    configurations = [
+        ("Pure Proportional (P)", 0.85, 0.0, 0.0),
+        ("Proportional-Integral (PI)", 0.85, 0.04, 0.0),
+        ("Tuned PID (Optimal)", 1.15, 0.02, 0.38)
+    ]
+
+    fig, ax = plt.subplots(figsize=(10, 5), facecolor="#141414")
+    ax.set_facecolor("#1e1e1e")
+    ax.tick_params(colors="white")
+    ax.xaxis.label.set_color("white")
+    ax.yaxis.label.set_color("white")
+    ax.title.set_color("white")
+    ax.grid(True, color="#333333")
+
+    print("=========================================================================")
+    print("      4WD VISION LINE FOLLOWER: PID PERFORMANCE STEP BENCHMARK           ")
+    print("=========================================================================")
+    print(f"{'Configuration':<28}{'Overshoot (%)':<16}{'Settling Time (s)':<18}{'Steady-State Err'}")
+    print("-------------------------------------------------------------------------")
+
+    for label, kp, ki, kd in configurations:
+        response = np.zeros(n)
+        error_int = 0.0
+        prev_err = 0.0
+        current_val = 0.0
+
+        for i in range(1, n):
+            err = step_target_px - current_val
+            error_int += err * dt
+            error_deriv = (err - prev_err) / dt
+
+            # Control effort u(t)
+            u = (kp * err) + (ki * error_int) + (kd * error_deriv)
+            
+            # Plant model: 1st order lag with delay representing motor inertia
+            tau_plant = 0.12
+            current_val += ((u - current_val) / tau_plant) * dt
+            response[i] = current_val
+            prev_err = err
+
+        # Performance Metrics
+        peak = np.max(response)
+        overshoot = max(0.0, ((peak - step_target_px) / step_target_px) * 100.0)
+        ss_err = abs(step_target_px - response[-1])
+        
+        # Settling time within 5% error band
+        within_band = np.where(abs(response - step_target_px) <= 0.05 * step_target_px)[0]
+        settling_time = t[within_band[0]] if len(within_band) > 0 else 4.0
+
+        print(f"{label:<28}{overshoot:<16.2f}{settling_time:<18.2f}{ss_err:.2f} px")
+        ax.plot(t, response, linewidth=2.0, label=label)
+
+    ax.axhline(step_target_px, color="red", linestyle="--", label="Target Displacement")
+    ax.set_title("Step Response Comparison: Lateral Pixel Error Correction", fontsize=12)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Lateral Track Position (px)")
+    ax.legend(facecolor="#2a2a2a", labelcolor="white")
+
+    plt.tight_layout()
+    plt.savefig("pid_step_response_benchmark.png", dpi=300, facecolor=fig.get_facecolor())
+    print("=========================================================================")
+    print("[INFO] Comparison plot exported to 'pid_step_response_benchmark.png'")
+
+if __name__ == "__main__":
+    evaluate_pid_responses()
