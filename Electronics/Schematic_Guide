@@ -1,0 +1,27 @@
+# 4WD Vision Line Follower: Avionics & Power Schematic
+
+### 1. Power Distribution Architecture
+* **Primary Battery:** 2S 18650 Li-ion Configuration ($7.4\text{V}$ Nominal, $8.4\text{V}$ Peak) or Single Cell with XL6009 Boost Converter.
+* **Charging & Protection Module:** Dual TP4056 Type-C modules with integrated DW01A over-discharge protection ($2.5\text{V}$ cutoff) and $1\text{A}$ linear CC/CV charge management.
+* **Motor Rail ($V_{mot}$):** $7.4\text{V}\text{--}8.4\text{V}$ unregulated rail feeding the L298N Dual H-Bridge power stage.
+* **Logic Rail ($V_{cc}$):** Regulated $5.0\text{V}$ output from L298N onboard linear regulator (or dedicated buck converter) feeding the 38-pin ESP32 NodeMCU development board.
+
+---
+
+### 2. Functional System Interconnect
+
+```text
+  [ 2x 18650 Li-ion Cells (7.4V) ] ──► [ TP4056 Type-C Protection ] ──► [ Rocker Switch ]
+                                                                             │
+       ┌─────────────────────────────────────────────────────────────────────┘
+       ▼
+  [ L298N Dual H-Bridge Motor Driver ]
+       ├── Motor Power: 7.4V - 8.4V
+       ├── Logic Reg: 5.0V Output ──► ESP32 VIN & Vision Companion Mount
+       │
+       ├── Left Motor Pair (Front + Rear Parallel) ◄── [ OUT1, OUT2 ]
+       └── Right Motor Pair (Front + Rear Parallel) ◄── [ OUT3, OUT4 ]
+       ▲
+       │ (PWM & Direction Control: GPIO 25, 26, 27, 14, 12, 13)
+       │
+  [ ESP32 NodeMCU (38-Pin) ] ◄── USB / Wi-Fi UDP Telemetry ◄── [ Vision Camera Rig ]
