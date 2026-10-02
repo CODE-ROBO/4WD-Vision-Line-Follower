@@ -1,0 +1,130 @@
+/**
+ * =============================================================================
+ * 4WD Vision Line Follower: ESP32 Differential Drive Closed-Loop PID
+ * Target: NodeMCU ESP32 (38-Pin)
+ * 
+ * Kinematic Objective:
+ * Parses lateral tracking error e(t) from camera serial stream and applies
+ * skid-steer differential drive velocity mixing:
+ *   v_left  = v_base - u(t)
+ *   v_right = v_base + u(t)
+ * =============================================================================
+ */
+
+#include <Arduino.h>
+
+// L298N Motor Driver Pinout
+constexpr uint8_t PIN_ENA = 25;
+constexpr uint8_t PIN_IN1 = 26;
+constexpr uint8_t PIN_IN2 = 27;
+constexpr uint8_t PIN_IN3 = 14;
+constexpr uint8_t PIN_IN4 = 12;
+constexpr uint8_t PIN_ENB = 13;
+constexpr uint8_t PIN_LED = 2;
+
+// PWM Configuration (ESP32 LEDC)
+constexpr uint32_t PWM_FREQ = 5000;      // 5 kHz
+constexpr uint8_t PWM_RES_BITS = 8;      // 8-bit resolution (0-255)
+constexpr uint8_t PWM_CH_LEFT  = 0;
+constexpr uint8_t PWM_CH_RIGHT = 1;
+
+// Kinematic & Speed Limits
+constexpr int16_t BASE_SPEED = 160;      // Nominal base PWM (0-255)
+constexpr int16_t MAX_PWM    = 250;
+constexpr int16_t MIN_PWM    = 0;
+
+// PID Tuning Constants
+float Kp = 1.15f;
+float Ki = 0.02f;
+float Kd = 0.38f;
+
+float integral_error = 0.0f;
+float previous_error = 0.0f;
+uint32_t last_time_ms = 0;
+
+void setMotorSpeeds(int16_t speed_left, int16_t speed_right) {
+  // Left Motor Direction & Saturation
+  if (speed_left >= 0) {
+    digitalWrite(PIN_IN1, HIGH);
+    digitalWrite(PIN_IN2, LOW);
+  } else {
+    digitalWrite(PIN_IN1, LOW);
+    digitalWrite(PIN_IN2, HIGH);
+    speed_left = -speed_left;
+  }
+  speed_left = constrain(speed_left, MIN_PWM, MAX_PWM);
+  ledcWrite(PWM_CH_LEFT, speed_left);
+
+  // Right Motor Direction & Saturation
+  if (speed_right >= 0) {
+    digitalWrite(PIN_IN3, HIGH);
+    digitalWrite(PIN_IN4, LOW);
+  } else {
+    digitalWrite(PIN_IN3, LOW);
+    digitalWrite(PIN_IN4, HIGH);
+    speed_right = -speed_right;
+  }
+  speed_right = constrain(speed_right, MIN_PWM, MAX_PWM);
+  ledcWrite(PWM_CH_RIGHT, speed_right);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PIN_IN1, OUTPUT);
+  pinMode(PIN_IN2, OUTPUT);
+  pinMode(PIN_IN3, OUTPUT);
+  pinMode(PIN_IN4, OUTPUT);
+  pinMode(PIN_LED, OUTPUT);
+
+  // Configure ESP32 LEDC PWM Channels
+  ledcSetup(PWM_CH_LEFT, PWM_FREQ, PWM_RES_BITS);
+  ledcAttachPin(PIN_ENA, PWM_CH_LEFT);
+
+  ledcSetup(PWM_CH_RIGHT, PWM_FREQ, PWM_RES_BITS);
+  ledcAttachPin(PIN_ENB, PWM_CH_RIGHT);
+
+  setMotorSpeeds(0, 0);
+  last_time_ms = millis();
+  Serial.println(F("[SYSTEM_INIT] 4WD ESP32 Vision Follower Online."));
+}
+
+void loop() {
+  // Listen for incoming lateral pixel error string: "ERR:<float>\n"
+  if (Serial.available() > 0) {
+    String payload = Serial.readStringUntil('\n');
+    payload.trim();
+
+    if (payload.startsWith("ERR:")) {
+      float error = payload.substring(4).toFloat();
+      uint32_t now = millis();
+      float dt = (now - last_time_ms) / 1000.0f;
+      if (dt <= 0.001f) dt = 0.001f;
+
+      // PID Calculation
+      integral_error += error * dt;
+      integral_error = constrain(integral_error, -100.0f, 100.0f); // Anti-windup
+      float derivative = (error - previous_error) / dt;
+
+      float correction = (Kp * error) + (Ki * integral_error) + (Kd * derivative);
+
+      // Differential Velocity Allocation
+      int16_t left_cmd  = (int16_t)(BASE_SPEED + correction);
+      int16_t right_cmd = (int16_t)(BASE_SPEED - correction);
+
+      setMotorSpeeds(left_cmd, right_cmd);
+
+      previous_error = error;
+      last_time_ms = now;
+
+      // Visual Lock Indicator (LED ON if centered within +/-15 pixels)
+      digitalWrite(PIN_LED, (abs(error) < 15.0f) ? HIGH : LOW);
+    }
+  }
+
+  // Safety Timeout: Halt motors if camera telemetry is lost for > 600 ms
+  if (millis() - last_time_ms > 600) {
+    setMotorSpeeds(0, 0);
+    digitalWrite(PIN_LED, LOW);
+  }
+}
