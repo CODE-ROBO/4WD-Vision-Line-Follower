@@ -1,0 +1,11 @@
+Item No,Category,Component Name,Part Specification,Qty,Reference Designator,Notes
+1,Compute,ESP32 Development Board,NodeMCU 38-Pin Dual-Core 240MHz Wi-Fi/BLE,1,U1_ESP32,Core motion controller & UART parser
+2,Actuation,Dual H-Bridge Motor Driver,L298N Module with 5V Linear Regulator,1,DRV1_L298N,Controls 4x BO motors in dual parallel banks
+3,Motors,Yellow BO Geared DC Motors,Dual Shaft Straight BO Motor 3-6V 1:48 Gear Ratio,4,M1-M4,2 Left parallel 2 Right parallel
+4,Locomotion,Rubber Track Wheels,70mm Diameter (7cm) Rubber Tread BO Wheels,4,W1-W4,Direct press-fit to BO motor shafts
+5,Energy,18650 Li-ion Battery Cells,3.7V 2500mAh 18650 Rechargeable Cells,2,BAT1-BAT2,Configured in 2S series pack (7.4V nominal)
+6,Charging,Type-C Charging Board,TP4056 Type-C with Over-Discharge Protection,2,CHG1-CHG2,Dual individual cell charging paths
+7,Regulator,Buck Converter Step-Down,LM2596 DC-DC Buck Converter Module,1,PSU1,Optional high-efficiency 5V drop from 2S battery
+8,Chassis,Laser-Cut / 3D Printed Chassis,Structural PLA / Acrylic Base Plate,1,MECH_BASE,Direct mounting for L298N and motors
+9,Switch,Mini Rocker Switch,SPST 2-Pin 250V/3A Toggle Switch,1,SW1_POWER,Main battery disconnect
+10,Suppression,Ceramic Disc Capacitors,100nF (0.1uF) 50V Ceramic Capacitors,4,C1-C4,Soldered directly across motor DC terminals
