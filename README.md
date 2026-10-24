@@ -10,7 +10,6 @@
   <img src="https://img.shields.io/badge/3D Printing-00GGGG?style=for-the-badge&logo=3DPrinting&logoColor=black" alt="3D Printing"/>
 </p>
 
-
 <p align="center">
   <img src="https://via.placeholder.com/800x400/0a0a0a/00FFFF?text=[INSERT+ROBOT+TRACKING+GIF+OR+HARDWARE+RENDER+HERE]" alt="Autonomous 4WD Robot Render" width="100%"/>
 </p>
