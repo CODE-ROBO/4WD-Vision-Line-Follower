@@ -11,7 +11,6 @@
 </p>
 
 
-
 <p align="center">
   <img src="https://via.placeholder.com/800x400/0a0a0a/00FFFF?text=[INSERT+ROBOT+TRACKING+GIF+OR+HARDWARE+RENDER+HERE]" alt="Autonomous 4WD Robot Render" width="100%"/>
 </p>
